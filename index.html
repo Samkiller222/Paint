@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Nonphoto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E2E6E3; --chrome:#F4F6F3; --panel:#FFFFFF; --ink:#23272B; --muted:#646C73;
+  --line:#D3D9D5; --blue:#2F82BD; --blue-soft:#E1EEF8; --rec:#CF3F39; --sel:#E9EDEA;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111416; --chrome:#1B1E21; --panel:#23272B; --ink:#E5E8EA; --muted:#9AA2A8;
+    --line:#353A3F; --blue:#6DB2E3; --blue-soft:#1C3242; --rec:#EF6A63; --sel:#2B3034;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111416; --chrome:#1B1E21; --panel:#23272B; --ink:#E5E8EA; --muted:#9AA2A8;
+  --line:#353A3F; --blue:#6DB2E3; --blue-soft:#1C3242; --rec:#EF6A63; --sel:#2B3034;
+  color-scheme: dark;
+}
+:root{ box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+*,*::before,*::after{ box-sizing:inherit; }
+html{ scroll-padding-top:env(safe-area-inset-top,0px); height:100%; }
+html,body{ height:100%; margin:0; }
+body{
+  background:var(--chrome); color:var(--ink); overflow:hidden;
+  font-family:Manrope, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size:15px;
+  -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
+}
+button,input,select{ font:inherit; color:inherit; }
+button{ background:none; border:0; cursor:pointer; padding:0; }
+button:disabled{ opacity:.35; cursor:default; }
+:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+.ic{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+
+#app{ display:grid; grid-template-rows:auto 1fr; height:100%; }
+header.top{ display:flex; align-items:center; gap:2px; padding:4px 6px; border-bottom:1px solid var(--line); min-width:0; }
+.brand{ font-weight:700; font-size:17px; letter-spacing:-0.01em; display:flex; align-items:center; gap:8px; margin:0 10px 0 4px; white-space:nowrap; }
+.brand i{ width:12px; height:12px; border-radius:3px; background:var(--blue); display:inline-block; }
+.spacer{ flex:1; }
+.rec{ font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; padding:0 8px; white-space:nowrap; }
+.rec b{ width:8px; height:8px; border-radius:50%; background:var(--rec); }
+.tb{ width:44px; height:44px; border-radius:10px; display:grid; place-items:center; flex:none; }
+.tb:hover:not(:disabled){ background:var(--sel); }
+.tb[aria-pressed="true"]{ background:var(--ink); color:var(--chrome); }
+
+main{ position:relative; display:grid; grid-template-columns:60px 1fr 292px; min-height:0; }
+main.no-panel{ grid-template-columns:60px 1fr 0; }
+.rail{ border-right:1px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0; overflow-y:auto; min-height:0; }
+.rail hr{ width:32px; border:0; border-top:1px solid var(--line); margin:4px 0; }
+.swatch{ width:36px; height:36px; border-radius:50%; border:2px solid var(--panel); box-shadow:0 0 0 1px var(--line); position:relative; overflow:hidden; display:block; cursor:pointer; }
+.swatch input{ position:absolute; inset:-8px; width:60px; height:60px; opacity:0; cursor:pointer; }
+.vslider{ display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11px; color:var(--muted); }
+.vslider input{ writing-mode:vertical-lr; direction:rtl; width:28px; height:120px; accent-color:var(--ink); }
+.vslider output{ font-variant-numeric:tabular-nums; color:var(--ink); font-weight:600; font-size:12px; }
+
+#viewport{ position:relative; overflow:hidden; background:var(--bg); touch-action:none; min-width:0; min-height:0; }
+#viewport.trace-mode{ cursor:move; }
+#stage{ position:absolute; left:0; top:0; transform-origin:0 0; background:#fff; box-shadow:0 0 0 1px rgba(0,0,0,.07), 0 10px 34px rgba(0,0,0,.14); }
+#stage canvas.layer{ position:absolute; left:0; top:0; width:100%; height:100%; }
+#trace{ position:absolute; left:0; top:0; transform-origin:0 0; pointer-events:none; max-width:none; }
+#trace.adjusting{ outline:3px dashed var(--blue); }
+.mode-banner{ position:absolute; left:50%; top:12px; transform:translateX(-50%); background:var(--blue); color:#fff; font-size:13px; font-weight:600; padding:8px 14px; border-radius:999px; display:none; pointer-events:none; white-space:nowrap; }
+#viewport.trace-mode .mode-banner{ display:block; }
+
+.panel{ border-left:1px solid var(--line); overflow-y:auto; padding:14px 12px; display:flex; flex-direction:column; gap:14px; background:var(--chrome); min-height:0; }
+main.no-panel .panel{ display:none; }
+.panel h2{ font-size:13px; font-weight:600; color:var(--muted); margin:0 0 6px 4px; }
+.layers{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; }
+.lrow{ display:flex; align-items:center; gap:4px; min-height:48px; border-radius:10px; padding:0 4px; }
+.lrow.active{ background:var(--sel); box-shadow:inset 3px 0 0 var(--ink); }
+.lrow .name{ flex:1; min-width:0; text-align:left; padding:4px 6px; font-size:14px; font-weight:500; }
+.lrow .name span{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lrow .name small{ display:block; font-size:11px; color:var(--blue); font-weight:600; }
+.lrow.hidden .name span{ color:var(--muted); }
+.ib{ width:38px; height:38px; border-radius:8px; display:grid; place-items:center; color:var(--muted); flex:none; }
+.ib:hover:not(:disabled){ background:var(--sel); }
+.ib.on{ color:var(--blue); background:var(--blue-soft); }
+.row-actions{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.chip{ min-height:38px; padding:0 12px; border-radius:9px; border:1px solid var(--line); background:var(--panel); font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px; }
+.chip .ic{ width:18px; height:18px; }
+.chip.on{ background:var(--blue); border-color:var(--blue); color:#fff; }
+
+.trace-card{ border:1.5px dashed var(--blue); background:var(--blue-soft); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px; }
+.trace-card h3{ margin:0; font-size:15px; font-weight:700; }
+.trace-card p{ margin:0; font-size:13px; color:var(--muted); line-height:1.45; }
+.field{ display:flex; align-items:center; gap:10px; font-size:13px; }
+.field input[type=range]{ flex:1; accent-color:var(--blue); }
+.field output{ width:36px; text-align:right; font-variant-numeric:tabular-nums; }
+.check{ display:flex; align-items:center; gap:8px; font-size:13px; min-height:32px; }
+.check input{ width:18px; height:18px; accent-color:var(--blue); }
+
+dialog{ border:1px solid var(--line); border-radius:14px; background:var(--panel); color:var(--ink); padding:18px; width:min(440px, calc(100vw - 32px)); max-height:calc(100% - 32px); }
+dialog::backdrop{ background:rgba(0,0,0,.4); }
+dialog h2{ margin:0 0 6px; font-size:19px; }
+dialog p{ margin:0 0 14px; color:var(--muted); line-height:1.5; font-size:14px; }
+.btns{ display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap; }
+.btn{ min-height:44px; padding:0 16px; border-radius:10px; border:1px solid var(--line); font-weight:600; background:var(--panel); }
+.btn.primary{ background:var(--ink); color:var(--chrome); border-color:var(--ink); }
+.btn.danger{ color:var(--rec); }
+.menu-list{ display:flex; flex-direction:column; gap:2px; }
+.menu-list button{ display:flex; align-items:center; gap:12px; min-height:50px; padding:0 10px; border-radius:10px; text-align:left; width:100%; }
+.menu-list button:hover{ background:var(--sel); }
+.menu-list small{ display:block; color:var(--muted); font-size:12px; }
+.menu-sep{ border:0; border-top:1px solid var(--line); margin:8px 0; }
+.presets{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.dims{ display:flex; gap:10px; align-items:center; }
+.dims label{ flex:1; font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+.dims input, dialog input[type=text], dialog select{ height:44px; border:1px solid var(--line); border-radius:10px; padding:0 10px; background:var(--chrome); width:100%; }
+.tl-preview{ width:100%; aspect-ratio:3/4; background:var(--bg); border-radius:10px; overflow:hidden; display:grid; place-items:center; margin:8px 0; }
+.tl-preview canvas{ max-width:100%; max-height:100%; }
+.bar{ height:6px; background:var(--sel); border-radius:3px; overflow:hidden; }
+.bar i{ display:block; height:100%; width:0; background:var(--rec); transition:width .15s linear; }
+
+#toast{ position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--chrome); padding:10px 16px; border-radius:10px; font-size:14px; font-weight:500; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:calc(100vw - 32px); z-index:50; }
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+@media (max-width:760px){
+  main, main.no-panel{ grid-template-columns:56px 1fr; }
+  .panel{ position:absolute; right:0; top:0; bottom:0; width:min(300px, 86vw); z-index:5; box-shadow:-10px 0 30px rgba(0,0,0,.18); }
+  .rec span{ display:none; }
+  .brand span{ display:none; }
+}
+@media (prefers-reduced-motion: reduce){ #toast, .bar i{ transition:none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <button class="tb" id="btnMenu" aria-label="File menu"></button>
+    <div class="brand"><i></i><span>Nonphoto</span></div>
+    <button class="tb" id="btnUndo" aria-label="Undo"></button>
+    <button class="tb" id="btnRedo" aria-label="Redo"></button>
+    <div class="spacer"></div>
+    <div class="rec" title="Every step is recorded for the timelapse"><b></b><span id="recCount">0 steps recorded</span></div>
+    <button class="tb" id="btnLock" aria-label="Lock zoom and rotation" aria-pressed="false"></button>
+    <button class="tb" id="btnFit" aria-label="Fit canvas to screen"></button>
+    <button class="tb" id="btnLayers" aria-label="Show layers" aria-pressed="true"></button>
+  </header>
+  <main id="main">
+    <nav class="rail" aria-label="Tools">
+      <button class="tb" data-tool="pen" aria-label="Pen" aria-pressed="true"></button>
+      <button class="tb" data-tool="eraser" aria-label="Eraser" aria-pressed="false"></button>
+      <button class="tb" data-tool="trace" aria-label="Move trace image" aria-pressed="false"></button>
+      <hr>
+      <label class="swatch" id="swatch" aria-label="Colour"><input type="color" id="color" value="#23272b"></label>
+      <div class="vslider"><output id="sizeOut">6</output><input type="range" id="size" min="1" max="120" value="6" aria-label="Brush size"><span>Size</span></div>
+      <div class="vslider"><output id="opOut">100</output><input type="range" id="opacity" min="5" max="100" value="100" aria-label="Brush opacity"><span>Opacity</span></div>
+    </nav>
+    <div id="viewport">
+      <div id="stage"></div>
+      <div class="mode-banner">Moving the trace image. Tap Pen to draw again.</div>
+    </div>
+    <aside class="panel" id="panel">
+      <section>
+        <h2>Layers</h2>
+        <ul class="layers" id="layerList"></ul>
+        <div class="row-actions">
+          <button class="chip" id="btnAddLayer"></button>
+          <button class="ib" id="btnUp" aria-label="Move layer up"></button>
+          <button class="ib" id="btnDown" aria-label="Move layer down"></button>
+          <button class="ib" id="btnRename" aria-label="Rename layer"></button>
+          <button class="ib" id="btnClear" aria-label="Clear layer"></button>
+          <button class="ib" id="btnDelete" aria-label="Delete layer"></button>
+        </div>
+      </section>
+      <section class="trace-card" id="traceCard">
+        <div>
+          <h3>Trace image</h3>
+          <p>You can see it while you draw. It never appears in the timelapse or exports.</p>
+        </div>
+        <div class="row-actions" style="margin-top:0">
+          <button class="chip" id="btnImport">Import image</button>
+          <button class="chip" id="btnAdjust">Move and resize</button>
+        </div>
+        <div class="field" id="traceOpField"><span>Opacity</span><input type="range" id="traceOp" min="5" max="100" value="45"><output id="traceOpOut">45</output></div>
+        <label class="check"><input type="checkbox" id="traceShow" checked> Show trace image</label>
+        <label class="check"><input type="checkbox" id="traceTop"> Show above my layers</label>
+        <button class="chip" id="btnTraceRemove" style="align-self:flex-start">Remove image</button>
+        <input type="file" id="traceFile" accept="image/*" hidden>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<dialog id="menuDlg">
+  <div class="menu-list">
+    <button data-act="timelapse"><span id="miVideo"></span><span>Export timelapse<small>Trace image and hidden-from-timelapse layers left out</small></span></button>
+    <button data-act="png"><span id="miPng"></span><span>Export image<small>PNG of what the timelapse shows</small></span></button>
+    <hr class="menu-sep">
+    <button data-act="new"><span id="miNew"></span><span>New canvas<small>Replaces the current drawing</small></span></button>
+    <label class="menu-list" style="padding:0 10px"><span class="check"><input type="checkbox" id="optFinger"> Draw with finger too (off keeps fingers for zoom only)</span></label>
+    <div class="field" style="padding:0 10px"><span>Line smoothing</span><input type="range" id="optSmooth" min="0" max="100" value="45"><output id="optSmoothOut">45</output></div>
+  </div>
+  <div class="btns"><button class="btn" data-close>Close</button></div>
+</dialog>
+
+<dialog id="newDlg">
+  <h2>New canvas</h2>
+  <p>This replaces your current drawing and its timelapse. Export first if you want to keep them.</p>
+  <div class="presets">
+    <button class="chip" data-w="1536" data-h="2048">Portrait</button>
+    <button class="chip" data-w="2048" data-h="2048">Square</button>
+    <button class="chip" data-w="2048" data-h="1536">Landscape</button>
+    <button class="chip" data-w="1080" data-h="1920">Phone</button>
+  </div>
+  <div class="dims">
+    <label>Width<input type="number" id="newW" min="200" max="4096" value="1536"></label>
+    <label>Height<input type="number" id="newH" min="200" max="4096" value="2048"></label>
+  </div>
+  <div class="btns"><button class="btn" data-close>Cancel</button><button class="btn primary" id="btnCreate">Create canvas</button></div>
+</dialog>
+
+<dialog id="tlDlg">
+  <h2>Export timelapse</h2>
+  <p id="tlNote">Your strokes replay from the start. The trace image and any layer marked hidden from timelapse are left out.</p>
+  <div id="tlSetup">
+    <div class="dims"><label>Video length<select id="tlLen"><option value="10">10 seconds</option><option value="20" selected>20 seconds</option><option value="30">30 seconds</option><option value="60">60 seconds</option></select></label></div>
+  </div>
+  <div id="tlRun" hidden>
+    <div class="tl-preview"><canvas id="tlCanvas"></canvas></div>
+    <div class="bar"><i id="tlBar"></i></div>
+  </div>
+  <div class="btns">
+    <button class="btn" id="tlCancel">Cancel</button>
+    <button class="btn primary" id="tlStart">Record timelapse</button>
+    <button class="btn primary" id="tlSave" hidden>Save video</button>
+  </div>
+</dialog>
+
+<dialog id="askDlg">
+  <h2 id="askTitle"></h2>
+  <p id="askText"></p>
+  <input type="text" id="askInput" hidden>
+  <div class="btns"><button class="btn" id="askNo">Cancel</button><button class="btn primary" id="askYes">OK</button></div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+
+/* ---------- icons ---------- */
+const P = {
+  menu:'M4 7h16M4 12h16M4 17h16',
+  undo:'M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3',
+  redo:'M15 14l5-5-5-5M20 9H10a6 6 0 000 12h3',
+  pen:'M4 20l4.5-1L19 8.5a2.1 2.1 0 00-3-3L5.5 16 4 20zM14.5 7l3 3',
+  eraser:'M9 20h11M5.2 15.8l9.6-9.6a2 2 0 012.8 0l2.2 2.2a2 2 0 010 2.8L12 19H8.4l-3.2-3.2z',
+  move:'M12 3v18M3 12h18M12 3L9.5 5.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5',
+  lock:'M6 11h12v9H6zM8 11V8a4 4 0 018 0v3',
+  unlock:'M6 11h12v9H6zM8 11V8a4 4 0 017.6-1.7',
+  fit:'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
+  layers:'M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5',
+  eye:'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 100-6 3 3 0 000 6z',
+  eyeOff:'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 100-6 3 3 0 000 6zM3 3l18 18',
+  video:'M3 7h12v10H3zM15 10.5L21 7v10l-6-3.5',
+  videoOff:'M3 7h12v10H3zM15 10.5L21 7v10l-6-3.5M2 3l20 18',
+  plus:'M12 5v14M5 12h14',
+  up:'M12 19V5M6 11l6-6 6 6',
+  down:'M12 5v14M6 13l6 6 6-6',
+  edit:'M4 20h4L19 9l-4-4L4 16v4z',
+  clear:'M5 5l14 14M19 5L5 19',
+  trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+  image:'M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15 9.5a1.5 1.5 0 100-.01',
+  doc:'M6 3h9l4 4v14H6zM14 3v5h5'
+};
+const icon = (n, cls='ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${P[n]}"/></svg>`;
+const setIcon = (el, n) => { el.innerHTML = icon(n); };
+setIcon($('#btnMenu'),'menu'); setIcon($('#btnUndo'),'undo'); setIcon($('#btnRedo'),'redo');
+setIcon($('#btnFit'),'fit'); setIcon($('#btnLayers'),'layers');
+setIcon(document.querySelector('[data-tool=pen]'),'pen');
+setIcon(document.querySelector('[data-tool=eraser]'),'eraser');
+setIcon(document.querySelector('[data-tool=trace]'),'move');
+$('#btnAddLayer').innerHTML = icon('plus') + 'Add layer';
+setIcon($('#btnUp'),'up'); setIcon($('#btnDown'),'down'); setIcon($('#btnRename'),'edit');
+setIcon($('#btnClear'),'clear'); setIcon($('#btnDelete'),'trash');
+$('#miVideo').innerHTML = icon('video'); $('#miPng').innerHTML = icon('image'); $('#miNew').innerHTML = icon('doc');
+
+/* ---------- elements ---------- */
+const viewport = $('#viewport'), stage = $('#stage'), main = $('#main');
+const traceEl = new Image(); traceEl.id = 'trace'; traceEl.alt = ''; traceEl.draggable = false;
+const liveTemp = document.createElement('canvas'); liveTemp.className = 'layer';
+const liveCtx = liveTemp.getContext('2d');
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 2600); }
+
+/* ---------- prefs ---------- */
+const prefs = { tool:'pen', color:'#23272b', size:6, opacity:100, smooth:45, fingerDraw:false, lockView:false };
+try { Object.assign(prefs, JSON.parse(localStorage.getItem('nonphoto-prefs') || '{}')); } catch(e){}
+if (prefs.tool === 'trace') prefs.tool = 'pen';
+function savePrefs(){ try { localStorage.setItem('nonphoto-prefs', JSON.stringify(prefs)); } catch(e){} }
+
+/* ---------- storage (IndexedDB) ---------- */
+let dbp = null;
+function openDB(){
+  if (!dbp) dbp = new Promise((res, rej) => {
+    const r = indexedDB.open('nonphoto', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  return dbp;
+}
+async function kvGet(k){ const db = await openDB(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+async function kvSet(k, v){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction('kv','readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+
+/* ---------- project state ---------- */
+const SNAP_EVERY = 100;
+let S = null;
+let view = new DOMMatrix(), viewInv = new DOMMatrix();
+
+function newState(w, h){
+  return { w, h, actions:[], redo:[], meta:{}, nextId:1, activeId:null, base:0, world:null, snap:null,
+    trace:{ blob:null, url:null, m:new DOMMatrix(), opacity:45, visible:true, onTop:false, iw:0, ih:0 } };
+}
+const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+const r1 = v => Math.round(v * 10) / 10;
+const r2 = v => Math.round(v * 100) / 100;
+const findL = (world, id) => world.layers.findIndex(l => l.id === id);
+const activeLayer = () => { const i = findL(S.world, S.activeId); return i >= 0 ? S.world.layers[i] : null; };
+const isPriv = id => !!(S.meta[id] && S.meta[id].priv);
+
+/* ---------- stroke rendering (shared by live, rebuild and timelapse) ---------- */
+const widthOf = (s, p) => Math.max(0.5, s.s * (0.15 + 0.85 * p));
+function drawSegs(ctx, s, from, to, color){
+  const p = s.p, n = p.length / 3;
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (n === 1){
+    if (from === 0){ ctx.beginPath(); ctx.arc(p[0], p[1], widthOf(s, p[2]) / 2, 0, Math.PI * 2); ctx.fill(); }
+    return;
+  }
+  for (let i = Math.max(1, from); i < to; i++){
+    const j = i * 3, k = j - 3;
+    ctx.lineWidth = widthOf(s, (p[k + 2] + p[j + 2]) / 2);
+    ctx.beginPath(); ctx.moveTo(p[k], p[k + 1]); ctx.lineTo(p[j], p[j + 1]); ctx.stroke();
+  }
+}
+function renderStroke(ctx, s, temp){
+  const n = s.p.length / 3;
+  if (s.tool === 'eraser'){
+    ctx.save(); ctx.globalCompositeOperation = 'destination-out'; drawSegs(ctx, s, 0, n, '#000'); ctx.restore(); return;
+  }
+  if (s.o >= 1){ drawSegs(ctx, s, 0, n, s.c); return; }
+  const tc = temp.getContext('2d');
+  tc.clearRect(0, 0, temp.width, temp.height);
+  drawSegs(tc, s, 0, n, s.c);
+  ctx.save(); ctx.globalAlpha = s.o; ctx.drawImage(temp, 0, 0); ctx.restore();
+  tc.clearRect(0, 0, temp.width, temp.height);
+}
+
+/* ---------- actions ---------- */
+function applyAction(world, a){
+  const i = a.id != null ? findL(world, a.id) : -1;
+  switch (a.t){
+    case 'add': {
+      const c = mkCanvas(world.w, world.h);
+      world.layers.splice(Math.min(a.at, world.layers.length), 0, { id:a.id, canvas:c, ctx:c.getContext('2d'), visible:true });
+      break;
+    }
+    case 'del': if (i >= 0) world.layers.splice(i, 1); break;
+    case 'vis': if (i >= 0) world.layers[i].visible = a.v; break;
+    case 'move': if (i >= 0){ const [L] = world.layers.splice(i, 1); world.layers.splice(Math.min(a.to, world.layers.length), 0, L); } break;
+    case 'clear': if (i >= 0) world.layers[i].ctx.clearRect(0, 0, world.w, world.h); break;
+    case 'stroke': if (i >= 0) renderStroke(world.layers[i].ctx, a, world.temp); break;
+  }
+}
+const structural = a => a.t !== 'stroke' && a.t !== 'clear';
+
+function copyCanvas(c){ const d = mkCanvas(c.width, c.height); d.getContext('2d').drawImage(c, 0, 0); return d; }
+function takeSnap(world, n){ S.snap = { n, layers: world.layers.map(l => ({ id:l.id, visible:l.visible, copy:copyCanvas(l.canvas) })) }; }
+
+function rebuild(){
+  const n = S.actions.length;
+  const world = { w:S.w, h:S.h, layers:[], temp:liveTemp };
+  let start = 0;
+  if (S.snap && S.snap.n <= n){
+    for (const l of S.snap.layers){ const c = copyCanvas(l.copy); world.layers.push({ id:l.id, canvas:c, ctx:c.getContext('2d'), visible:l.visible }); }
+    start = S.snap.n;
+  } else S.snap = null;
+  const snapAt = Math.floor(n / SNAP_EVERY) * SNAP_EVERY;
+  for (let i = start; i < n; i++){
+    applyAction(world, S.actions[i]);
+    if (!S.snap && i + 1 === snapAt) takeSnap(world, snapAt);
+  }
+  S.world = world;
+  ensureActive();
+  syncDOM(); renderPanel(); updateStatus();
+}
+function ensureActive(){
+  if (findL(S.world, S.activeId) < 0){
+    const ls = S.world.layers; S.activeId = ls.length ? ls[ls.length - 1].id : null;
+  }
+}
+function pushAction(a, applied){
+  if (!applied) applyAction(S.world, a);
+  S.actions.push(a); S.redo.length = 0;
+  if (S.actions.length % SNAP_EVERY === 0) takeSnap(S.world, S.actions.length);
+  if (structural(a)){ ensureActive(); syncDOM(); renderPanel(); }
+  updateStatus(); scheduleSave();
+}
+function undo(){
+  if (cur || S.actions.length <= S.base) return;
+  S.redo.push(S.actions.pop());
+  rebuild(); scheduleSave();
+}
+function redo(){
+  if (cur || !S.redo.length) return;
+  const a = S.redo.pop();
+  applyAction(S.world, a); S.actions.push(a);
+  if (S.actions.length % SNAP_EVERY === 0) takeSnap(S.world, S.actions.length);
+  if (structural(a)){ ensureActive(); syncDOM(); renderPanel(); }
+  updateStatus(); scheduleSave();
+}
+
+/* ---------- DOM sync ---------- */
+function syncDOM(){
+  stage.style.width = S.w + 'px'; stage.style.height = S.h + 'px';
+  stage.replaceChildren();
+  if (!S.trace.onTop) stage.append(traceEl);
+  for (const L of S.world.layers){
+    L.canvas.className = 'layer';
+    L.canvas.style.display = L.visible ? '' : 'none';
+    stage.append(L.canvas);
+    if (L.id === S.activeId) stage.append(liveTemp);
+  }
+  if (S.trace.onTop) stage.append(traceEl);
+  applyTraceStyle();
+}
+function applyTraceStyle(){
+  const t = S.trace;
+  traceEl.style.display = (t.url && t.visible) ? '' : 'none';
+  traceEl.style.opacity = t.opacity / 100;
+  traceEl.style.width = t.iw + 'px'; traceEl.style.height = t.ih + 'px';
+  traceEl.style.transform = t.m.toString();
+  traceEl.classList.toggle('adjusting', prefs.tool === 'trace');
+}
+function updateStatus(){
+  const n = S.actions.length - S.base;
+  $('#recCount').textContent = n === 1 ? '1 step recorded' : `${n} steps recorded`;
+  $('#btnUndo').disabled = S.actions.length <= S.base;
+  $('#btnRedo').disabled = !S.redo.length;
+}
+
+/* ---------- layers panel ---------- */
+function renderPanel(){
+  const ul = $('#layerList'); ul.replaceChildren();
+  const ls = S.world.layers;
+  for (let i = ls.length - 1; i >= 0; i--){
+    const L = ls[i], m = S.meta[L.id] || { name:'Layer', priv:false };
+    const li = document.createElement('li');
+    li.className = 'lrow' + (L.id === S.activeId ? ' active' : '') + (L.visible ? '' : ' hidden');
+    const eye = document.createElement('button');
+    eye.className = 'ib'; eye.innerHTML = icon(L.visible ? 'eye' : 'eyeOff');
+    eye.setAttribute('aria-label', L.visible ? `Hide ${m.name}` : `Show ${m.name}`);
+    eye.onclick = () => pushAction({ t:'vis', id:L.id, v:!L.visible });
+    const name = document.createElement('button');
+    name.className = 'name';
+    const sp = document.createElement('span'); sp.textContent = m.name; name.append(sp);
+    if (m.priv){ const sm = document.createElement('small'); sm.textContent = 'Hidden from timelapse'; name.append(sm); }
+    name.onclick = () => { S.activeId = L.id; syncDOM(); renderPanel(); scheduleSave(); };
+    const pv = document.createElement('button');
+    pv.className = 'ib' + (m.priv ? ' on' : ''); pv.innerHTML = icon(m.priv ? 'videoOff' : 'video');
+    pv.setAttribute('aria-pressed', String(m.priv));
+    pv.setAttribute('aria-label', m.priv ? `Show ${m.name} in timelapse` : `Hide ${m.name} from timelapse`);
+    pv.onclick = () => { m.priv = !m.priv; S.meta[L.id] = m; renderPanel(); scheduleSave();
+      toast(m.priv ? `${m.name} won't appear in the timelapse` : `${m.name} will appear in the timelapse`); };
+    li.append(eye, name, pv); ul.append(li);
+  }
+  const i = findL(S.world, S.activeId);
+  $('#btnUp').disabled = i < 0 || i >= ls.length - 1;
+  $('#btnDown').disabled = i <= 0;
+  $('#btnDelete').disabled = ls.length <= 1;
+  const t = S.trace;
+  $('#btnImport').textContent = t.url ? 'Replace image' : 'Import image';
+  $('#btnAdjust').disabled = !t.url; $('#btnTraceRemove').disabled = !t.url;
+  $('#btnAdjust').classList.toggle('on', prefs.tool === 'trace');
+  $('#traceOp').value = t.opacity; $('#traceOpOut').textContent = t.opacity;
+  $('#traceShow').checked = t.visible; $('#traceTop').checked = t.onTop;
+}
+
+function addLayer(){
+  const id = S.nextId++;
+  S.meta[id] = { name:`Layer ${id}`, priv:false };
+  const i = findL(S.world, S.activeId);
+  S.activeId = id;
+  pushAction({ t:'add', id, at: i + 1 });
+}
+$('#btnAddLayer').onclick = addLayer;
+$('#btnUp').onclick = () => { const i = findL(S.world, S.activeId); if (i >= 0 && i < S.world.layers.length - 1) pushAction({ t:'move', id:S.activeId, to:i + 1 }); };
+$('#btnDown').onclick = () => { const i = findL(S.world, S.activeId); if (i > 0) pushAction({ t:'move', id:S.activeId, to:i - 1 }); };
+$('#btnRename').onclick = async () => {
+  const m = S.meta[S.activeId]; if (!m) return;
+  const v = await ask('Rename layer', '', 'Rename', m.name);
+  if (v && v.trim()){ m.name = v.trim().slice(0, 40); renderPanel(); scheduleSave(); }
+};
+$('#btnClear').onclick = async () => {
+  const m = S.meta[S.activeId]; if (!m) return;
+  if (await ask(`Clear ${m.name}?`, 'The clearing shows in the timelapse unless this layer is hidden from it. You can undo it.', 'Clear layer')) pushAction({ t:'clear', id:S.activeId });
+};
+$('#btnDelete').onclick = async () => {
+  const m = S.meta[S.activeId]; if (!m || S.world.layers.length <= 1) return;
+  if (await ask(`Delete ${m.name}?`, 'You can undo this.', 'Delete layer')) pushAction({ t:'del', id:S.activeId });
+};
+
+/* ---------- dialogs ---------- */
+function ask(title, text, okLabel, inputValue){
+  return new Promise(res => {
+    const d = $('#askDlg'); $('#askTitle').textContent = title; $('#askText').textContent = text;
+    $('#askText').hidden = !text;
+    const inp = $('#askInput'); inp.hidden = inputValue == null; if (inputValue != null) inp.value = inputValue;
+    $('#askYes').textContent = okLabel;
+    const done = v => { d.close(); $('#askYes').onclick = $('#askNo').onclick = null; res(v); };
+    $('#askYes').onclick = () => done(inputValue != null ? inp.value : true);
+    $('#askNo').onclick = () => done(inputValue != null ? null : false);
+    d.onclose = () => res(inputValue != null ? null : false);
+    d.showModal(); if (inputValue != null) inp.select();
+  });
+}
+document.querySelectorAll('dialog [data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
+
+/* ---------- view ---------- */
+function setView(m){ view = m; viewInv = m.inverse(); stage.style.transform = m.toString(); }
+function fitView(){
+  const r = viewport.getBoundingClientRect(); const pad = 24;
+  const s = Math.max(0.02, Math.min((r.width - pad * 2) / S.w, (r.height - pad * 2) / S.h));
+  setView(new DOMMatrix().translate((r.width - S.w * s) / 2, (r.height - S.h * s) / 2).scale(s));
+}
+function toCanvas(e){ const r = viewport.getBoundingClientRect(); return viewInv.transformPoint(new DOMPoint(e.clientX - r.left, e.clientY - r.top)); }
+function toViewport(e){ const r = viewport.getBoundingClientRect(); return { x:e.clientX - r.left, y:e.clientY - r.top }; }
+function pairDelta(a1, a2, b1, b2){
+  const ca = { x:(a1.x + a2.x) / 2, y:(a1.y + a2.y) / 2 }, cb = { x:(b1.x + b2.x) / 2, y:(b1.y + b2.y) / 2 };
+  const da = Math.hypot(a2.x - a1.x, a2.y - a1.y) || 1, db = Math.hypot(b2.x - b1.x, b2.y - b1.y) || 1;
+  const ang = (Math.atan2(b2.y - b1.y, b2.x - b1.x) - Math.atan2(a2.y - a1.y, a2.x - a1.x)) * 180 / Math.PI;
+  return new DOMMatrix().translate(cb.x, cb.y).rotate(ang).scale(db / da).translate(-ca.x, -ca.y);
+}
+
+/* ---------- drawing input ---------- */
+let cur = null;       // active stroke
+let lastPen = -1e9;   // last time a pen was seen (palm rejection)
+const vp = new Map(); // touch points for view gestures
+let vStart = null;
+const tp = new Map(); // pointers for trace adjusting
+let tStart = null;
+
+const pressureOf = e => e.pointerType === 'pen' ? (e.pressure > 0 ? e.pressure : 0.5) : 1;
+const smoothK = () => 1 - (prefs.smooth / 100) * 0.9;
+
+function startStroke(e){
+  const L = activeLayer();
+  if (!L) return;
+  if (!L.visible){ toast('This layer is hidden. Show it to draw on it.'); return; }
+  const p = toCanvas(e), pr = pressureOf(e);
+  const s = { t:'stroke', id:L.id, tool:prefs.tool, c:prefs.color, s:prefs.size, o: prefs.tool === 'eraser' ? 1 : prefs.opacity / 100, p:[r1(p.x), r1(p.y), r2(pr)] };
+  cur = { pid:e.pointerId, type:e.pointerType, s, x:p.x, y:p.y, pr, rx:p.x, ry:p.y, rp:pr, drawn:1, t0:performance.now() };
+  liveTemp.style.opacity = s.o;
+}
+function addPoint(x, y, pr){
+  const k = smoothK();
+  cur.x += (x - cur.x) * k; cur.y += (y - cur.y) * k; cur.pr += (pr - cur.pr) * Math.min(1, k * 1.6);
+  const P = cur.s.p, n = P.length;
+  const dx = cur.x - P[n - 3], dy = cur.y - P[n - 2];
+  if (dx * dx + dy * dy < 0.25) return;
+  P.push(r1(cur.x), r1(cur.y), r2(cur.pr));
+}
+function flushLive(){
+  const s = cur.s, n = s.p.length / 3;
+  if (n <= cur.drawn) return;
+  if (s.tool === 'eraser'){
+    const c = activeLayer().ctx; c.save(); c.globalCompositeOperation = 'destination-out'; drawSegs(c, s, cur.drawn, n, '#000'); c.restore();
+  } else drawSegs(liveCtx, s, cur.drawn, n, s.c);
+  cur.drawn = n;
+}
+function moveStroke(e){
+  const evs = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
+  for (const ev of evs){ const p = toCanvas(ev), pr = pressureOf(ev); cur.rx = p.x; cur.ry = p.y; cur.rp = pr; addPoint(p.x, p.y, pr); }
+  flushLive();
+}
+function endStroke(){
+  for (let i = 0; i < 40 && Math.hypot(cur.rx - cur.x, cur.ry - cur.y) > 0.5; i++) addPoint(cur.rx, cur.ry, cur.rp);
+  flushLive();
+  const s = cur.s, L = activeLayer(), n = s.p.length / 3;
+  if (s.tool === 'pen'){
+    if (n === 1) drawSegs(liveCtx, s, 0, 1, s.c);
+    L.ctx.save(); L.ctx.globalAlpha = s.o; L.ctx.drawImage(liveTemp, 0, 0); L.ctx.restore();
+    liveCtx.clearRect(0, 0, S.w, S.h);
+  } else if (n === 1){
+    L.ctx.save(); L.ctx.globalCompositeOperation = 'destination-out'; drawSegs(L.ctx, s, 0, 1, '#000'); L.ctx.restore();
+  }
+  cur = null;
+  pushAction(s, true);
+}
+function cancelStroke(){
+  if (!cur) return;
+  const wasEraser = cur.s.tool === 'eraser';
+  cur = null; liveCtx.clearRect(0, 0, S.w, S.h);
+  if (wasEraser) rebuild();
+}
+
+function vReset(){ const pts = [...vp.values()]; vStart = pts.length >= 2 ? { m:view, pts:pts.map(p => ({ ...p })) } : null; }
+function gestureAllowed(){ return !prefs.lockView && !(cur && cur.type !== 'touch') && performance.now() - lastPen > 350; }
+function tReset(){ const pts = [...tp.values()]; tStart = pts.length ? { m:S.trace.m, pts:pts.map(p => ({ ...p })) } : null; }
+
+viewport.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'pen') lastPen = performance.now();
+  try { viewport.setPointerCapture(e.pointerId); } catch(err){}
+
+  if (prefs.tool === 'trace'){
+    if (!S.trace.url) return;
+    const p = toCanvas(e); tp.set(e.pointerId, { x:p.x, y:p.y }); tReset(); return;
+  }
+
+  if (e.pointerType === 'touch'){
+    if (prefs.fingerDraw && vp.size === 0 && !cur){ vp.set(e.pointerId, toViewport(e)); startStroke(e); return; }
+    vp.set(e.pointerId, toViewport(e));
+    if (cur && cur.type === 'touch'){
+      if (performance.now() - cur.t0 < 250) cancelStroke(); else return;
+    }
+    if (vp.size >= 2 && gestureAllowed()) vReset();
+    return;
+  }
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  if (cur) return;
+  vStart = null;
+  startStroke(e);
+});
+viewport.addEventListener('pointermove', e => {
+  if (e.pointerType === 'pen') lastPen = performance.now();
+  if (prefs.tool === 'trace'){
+    if (!tp.has(e.pointerId) || !tStart) return;
+    const p = toCanvas(e); tp.set(e.pointerId, { x:p.x, y:p.y });
+    const b = [...tp.values()], a = tStart.pts;
+    let d;
+    if (b.length >= 2 && a.length >= 2) d = pairDelta(a[0], a[1], b[0], b[1]);
+    else d = new DOMMatrix().translate(b[0].x - a[0].x, b[0].y - a[0].y);
+    S.trace.m = d.multiply(tStart.m); applyTraceStyle();
+    return;
+  }
+  if (cur && e.pointerId === cur.pid){ if (vp.has(e.pointerId)) vp.set(e.pointerId, toViewport(e)); moveStroke(e); return; }
+  if (vp.has(e.pointerId)){
+    vp.set(e.pointerId, toViewport(e));
+    if (vStart && vp.size >= 2){
+      if (!gestureAllowed()){ vStart = null; return; }
+      const b = [...vp.values()];
+      setView(pairDelta(vStart.pts[0], vStart.pts[1], b[0], b[1]).multiply(vStart.m));
+    }
+  }
+});
+function pointerEnd(e){
+  if (prefs.tool === 'trace'){
+    if (tp.delete(e.pointerId)){ tReset(); if (!tp.size) scheduleSave(); }
+    return;
+  }
+  if (cur && e.pointerId === cur.pid){
+    if (e.type === 'pointercancel') cancelStroke(); else endStroke();
+  }
+  if (vp.delete(e.pointerId)) vReset();
+}
+viewport.addEventListener('pointerup', pointerEnd);
+viewport.addEventListener('pointercancel', pointerEnd);
+viewport.addEventListener('contextmenu', e => e.preventDefault());
+viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (prefs.lockView) return;
+  const p = toViewport(e), k = Math.exp(-e.deltaY * 0.0015);
+  setView(new DOMMatrix().translate(p.x, p.y).scale(k).translate(-p.x, -p.y).multiply(view));
+}, { passive:false });
+
+/* ---------- tools and brush ---------- */
+function setTool(t){
+  if (t === 'trace' && !S.trace.url){ toast('Import a trace image first.'); return; }
+  prefs.tool = t; savePrefs();
+  document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
+  viewport.classList.toggle('trace-mode', t === 'trace');
+  tp.clear(); tStart = null;
+  applyTraceStyle(); renderPanel();
+}
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+const colorIn = $('#color'), sizeIn = $('#size'), opIn = $('#opacity');
+function syncBrushUI(){
+  colorIn.value = prefs.color; $('#swatch').style.background = prefs.color;
+  sizeIn.value = prefs.size; $('#sizeOut').textContent = prefs.size;
+  opIn.value = prefs.opacity; $('#opOut').textContent = prefs.opacity;
+  $('#optFinger').checked = prefs.fingerDraw;
+  $('#optSmooth').value = prefs.smooth; $('#optSmoothOut').textContent = prefs.smooth;
+  $('#btnLock').setAttribute('aria-pressed', String(prefs.lockView));
+  setIcon($('#btnLock'), prefs.lockView ? 'lock' : 'unlock');
+}
+colorIn.oninput = () => { prefs.color = colorIn.value; syncBrushUI(); savePrefs(); };
+sizeIn.oninput = () => { prefs.size = +sizeIn.value; syncBrushUI(); savePrefs(); };
+opIn.oninput = () => { prefs.opacity = +opIn.value; syncBrushUI(); savePrefs(); };
+$('#optFinger').onchange = e => { prefs.fingerDraw = e.target.checked; savePrefs(); };
+$('#optSmooth').oninput = e => { prefs.smooth = +e.target.value; syncBrushUI(); savePrefs(); };
+$('#btnLock').onclick = () => { prefs.lockView = !prefs.lockView; vStart = null; syncBrushUI(); savePrefs(); toast(prefs.lockView ? 'Zoom and rotation locked' : 'Zoom and rotation unlocked'); };
+$('#btnFit').onclick = fitView;
+$('#btnUndo').onclick = undo; $('#btnRedo').onclick = redo;
+$('#btnLayers').onclick = () => {
+  const open = main.classList.toggle('no-panel') === false;
+  $('#btnLayers').setAttribute('aria-pressed', String(open));
+};
+if (window.matchMedia('(max-width:760px)').matches){ main.classList.add('no-panel'); $('#btnLayers').setAttribute('aria-pressed','false'); }
+
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, select')) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  else if (mod && e.key.toLowerCase() === 'y'){ e.preventDefault(); redo(); }
+  else if (!mod && e.key === 'b') setTool('pen');
+  else if (!mod && e.key === 'e') setTool('eraser');
+});
+
+/* ---------- trace image ---------- */
+async function setTraceBlob(blob, fit){
+  if (S.trace.url) URL.revokeObjectURL(S.trace.url);
+  const url = URL.createObjectURL(blob);
+  traceEl.src = url;
+  try { await traceEl.decode(); } catch(e){ URL.revokeObjectURL(url); toast("That file couldn't be opened as an image."); return false; }
+  S.trace.blob = blob; S.trace.url = url; S.trace.iw = traceEl.naturalWidth; S.trace.ih = traceEl.naturalHeight;
+  if (fit){
+    const s = Math.min(S.w / S.trace.iw, S.h / S.trace.ih);
+    S.trace.m = new DOMMatrix().translate((S.w - S.trace.iw * s) / 2, (S.h - S.trace.ih * s) / 2).scale(s);
+    S.trace.visible = true;
+  }
+  return true;
+}
+$('#btnImport').onclick = () => $('#traceFile').click();
+$('#traceFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (await setTraceBlob(f, true)){ syncDOM(); renderPanel(); scheduleSave(); toast('Trace image added. It stays out of the timelapse.'); }
+};
+$('#btnAdjust').onclick = () => setTool(prefs.tool === 'trace' ? 'pen' : 'trace');
+$('#traceOp').oninput = e => { S.trace.opacity = +e.target.value; $('#traceOpOut').textContent = S.trace.opacity; applyTraceStyle(); scheduleSave(); };
+$('#traceShow').onchange = e => { S.trace.visible = e.target.checked; applyTraceStyle(); scheduleSave(); };
+$('#traceTop').onchange = e => { S.trace.onTop = e.target.checked; syncDOM(); scheduleSave(); };
+$('#btnTraceRemove').onclick = () => {
+  if (S.trace.url) URL.revokeObjectURL(S.trace.url);
+  Object.assign(S.trace, { blob:null, url:null, iw:0, ih:0, m:new DOMMatrix() });
+  traceEl.removeAttribute('src');
+  if (prefs.tool === 'trace') setTool('pen');
+  syncDOM(); renderPanel(); scheduleSave();
+};
+
+/* ---------- saving ---------- */
+let saveT, saveWarned = false;
+function scheduleSave(){ clearTimeout(saveT); saveT = setTimeout(saveNow, 900); }
+async function saveNow(){
+  const t = S.trace, m = t.m;
+  try {
+    await kvSet('project', {
+      v:1, w:S.w, h:S.h, actions:S.actions, meta:S.meta, nextId:S.nextId, activeId:S.activeId, base:S.base,
+      trace:{ blob:t.blob, m:[m.a, m.b, m.c, m.d, m.e, m.f], opacity:t.opacity, visible:t.visible, onTop:t.onTop }
+    });
+  } catch(e){
+    if (!saveWarned){ saveWarned = true; toast("Couldn't save to this browser. Export your work before closing."); }
+  }
+}
+window.addEventListener('pagehide', saveNow);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
+
+/* ---------- file saving via the viewer ---------- */
+let dlP = null;
+function getDownloads(){
+  if (!dlP) dlP = (window.claude && window.claude.use ? Promise.resolve(window.claude.use('downloads')) : Promise.resolve(null)).catch(() => null);
+  return dlP;
+}
+function fallbackDownload(name, blob){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+async function saveFile(name, blob){
+  const d = await getDownloads();
+  if (d){
+    try { await d.save({ filename:name, data:blob }); toast(`Saved ${name}`); }
+    catch(err){
+      const c = err && err.code;
+      if (c === 'declined') return;
+      if (c === 'rate_limited'){ toast('A save prompt is already open.'); return; }
+      if (c === 'too_large'){ toast('That file is too large to save here. Try a shorter video.'); return; }
+      fallbackDownload(name, blob);
+    }
+    return;
+  }
+  fallbackDownload(name, blob);
+}
+
+/* ---------- menu ---------- */
+$('#btnMenu').onclick = () => { syncBrushUI(); $('#menuDlg').showModal(); };
+$('#menuDlg').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  $('#menuDlg').close();
+  if (b.dataset.act === 'png') exportPNG();
+  if (b.dataset.act === 'timelapse') openTimelapse();
+  if (b.dataset.act === 'new'){ $('#newW').value = S.w; $('#newH').value = S.h; $('#newDlg').showModal(); }
+});
+document.querySelectorAll('#newDlg [data-w]').forEach(b => b.onclick = () => { $('#newW').value = b.dataset.w; $('#newH').value = b.dataset.h; });
+$('#btnCreate').onclick = () => {
+  const w = Math.round(+$('#newW').value), h = Math.round(+$('#newH').value);
+  if (!(w >= 200 && w <= 4096 && h >= 200 && h <= 4096)){ toast('Width and height must be between 200 and 4096.'); return; }
+  $('#newDlg').close();
+  const keepTrace = S.trace.blob;
+  S = newState(w, h);
+  startProject();
+  if (keepTrace) setTraceBlob(keepTrace, true).then(() => { syncDOM(); renderPanel(); scheduleSave(); });
+  scheduleSave();
+};
+
+/* ---------- export image ---------- */
+function compositeFinal(){
+  const c = mkCanvas(S.w, S.h), x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0, 0, S.w, S.h);
+  for (const L of S.world.layers) if (L.visible && !isPriv(L.id)) x.drawImage(L.canvas, 0, 0);
+  return c;
+}
+function exportPNG(){
+  compositeFinal().toBlob(b => { if (b) saveFile('nonphoto-drawing.png', b); else toast("Couldn't create the image."); }, 'image/png');
+}
+
+/* ---------- timelapse ---------- */
+let tl = null;
+function pickMime(){
+  const list = ['video/mp4;codecs=avc1.42E01F', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  return list.find(m => { try { return MediaRecorder.isTypeSupported(m); } catch(e){ return false; } }) || '';
+}
+function openTimelapse(){
+  const strokes = S.actions.filter(a => a.t === 'stroke' && !isPriv(a.id)).length;
+  if (!strokes){ toast('Nothing to replay yet. Draw something first.'); return; }
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream){ toast("This browser can't record video."); return; }
+  $('#tlSetup').hidden = false; $('#tlRun').hidden = true;
+  $('#tlStart').hidden = false; $('#tlSave').hidden = true; $('#tlCancel').textContent = 'Cancel';
+  $('#tlNote').textContent = 'Your strokes replay from the start. The trace image and any layer marked hidden from timelapse are left out.';
+  $('#tlBar').style.width = '0';
+  $('#tlDlg').showModal();
+}
+$('#tlCancel').onclick = () => { if (tl) tl.cancelled = true; $('#tlDlg').close(); };
+$('#tlDlg').addEventListener('close', () => { if (tl) tl.cancelled = true; });
+$('#tlSave').onclick = () => { if (tl && tl.blob) saveFile(tl.name, tl.blob); };
+$('#tlStart').onclick = async () => {
+  const mime = pickMime();
+  if (!mime){ toast("This browser can't record video."); return; }
+  $('#tlSetup').hidden = true; $('#tlRun').hidden = false; $('#tlStart').hidden = true;
+  $('#tlNote').textContent = 'Recording. Keep this screen open until it finishes.';
+  const seconds = +$('#tlLen').value;
+  const job = tl = { cancelled:false, blob:null, name:'' };
+
+  const sc = Math.min(1, 1920 / Math.max(S.w, S.h));
+  const vw = Math.max(2, Math.round(S.w * sc / 2) * 2), vh = Math.max(2, Math.round(S.h * sc / 2) * 2);
+  const out = $('#tlCanvas'); out.width = vw; out.height = vh;
+  const o = out.getContext('2d');
+  const world = { w:S.w, h:S.h, layers:[], temp:mkCanvas(S.w, S.h) };
+  const tctx = world.temp.getContext('2d');
+  const acts = S.actions.slice();
+  let total = 0;
+  for (const a of acts) if (a.t === 'stroke' && !isPriv(a.id)) total += a.p.length / 3;
+  const fps = 30, per = Math.max(1, total / (seconds * fps));
+  let ai = 0, pi = 0, inStroke = null;
+
+  function step(budget){
+    while (budget > 0 && ai < acts.length){
+      const a = acts[ai];
+      if (a.t !== 'stroke'){ if (!(a.t === 'clear' && isPriv(a.id))) applyAction(world, a); ai++; continue; }
+      const li = findL(world, a.id);
+      if (isPriv(a.id) || li < 0){ ai++; continue; }
+      const L = world.layers[li], n = a.p.length / 3;
+      if (!inStroke){ inStroke = a; pi = 0; }
+      const to = Math.min(n, pi + Math.ceil(budget));
+      if (a.tool === 'eraser'){ L.ctx.save(); L.ctx.globalCompositeOperation = 'destination-out'; drawSegs(L.ctx, a, pi, to, '#000'); L.ctx.restore(); }
+      else drawSegs(tctx, a, pi, to, a.c);
+      budget -= Math.max(1, to - pi); pi = to;
+      if (pi >= n){
+        if (a.tool === 'pen'){ L.ctx.save(); L.ctx.globalAlpha = a.o; L.ctx.drawImage(world.temp, 0, 0); L.ctx.restore(); tctx.clearRect(0, 0, S.w, S.h); }
+        inStroke = null; ai++;
+      }
+    }
+  }
+  function compose(){
+    o.globalAlpha = 1; o.fillStyle = '#fff'; o.fillRect(0, 0, vw, vh);
+    for (const L of world.layers){
+      if (!L.visible || isPriv(L.id)) continue;
+      o.drawImage(L.canvas, 0, 0, vw, vh);
+      if (inStroke && inStroke.id === L.id && inStroke.tool === 'pen'){ o.globalAlpha = inStroke.o; o.drawImage(world.temp, 0, 0, vw, vh); o.globalAlpha = 1; }
+    }
+  }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  compose();
+  const stream = out.captureStream(fps);
+  let rec;
+  try { rec = new MediaRecorder(stream, { mimeType:mime, videoBitsPerSecond:10000000 }); }
+  catch(e){ toast("This browser can't record video."); $('#tlDlg').close(); return; }
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(r => rec.onstop = r);
+  rec.start(500);
+  await sleep(300);
+  while (ai < acts.length && !job.cancelled){
+    step(per); compose();
+    $('#tlBar').style.width = (100 * ai / acts.length).toFixed(1) + '%';
+    await sleep(1000 / fps);
+  }
+  compose(); $('#tlBar').style.width = '100%';
+  if (!job.cancelled) await sleep(1500);
+  rec.stop(); await stopped;
+  stream.getTracks().forEach(t => t.stop());
+  if (job.cancelled) return;
+  const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
+  job.blob = new Blob(chunks, { type:mime.split(';')[0] });
+  job.name = `nonphoto-timelapse.${ext}`;
+  $('#tlNote').textContent = ext === 'webm'
+    ? 'Done. This browser records WebM, which most video apps and TikTok accept. Convert it to MP4 if one does not.'
+    : 'Done. Save the video to keep it.';
+  $('#tlSave').hidden = false; $('#tlCancel').textContent = 'Close';
+};
+
+/* ---------- boot ---------- */
+function startProject(){
+  liveTemp.width = S.w; liveTemp.height = S.h;
+  if (!S.actions.length){
+    const id = S.nextId++; S.meta[id] = { name:'Layer 1', priv:false };
+    S.actions.push({ t:'add', id, at:0 }); S.activeId = id; S.base = 1;
+  }
+  if (!S.trace.url){ traceEl.removeAttribute('src'); }
+  rebuild();
+  requestAnimationFrame(fitView);
+}
+async function boot(){
+  syncBrushUI();
+  let data = null;
+  try { data = await kvGet('project'); } catch(e){}
+  if (data && data.v === 1 && data.w && data.h){
+    S = newState(data.w, data.h);
+    S.actions = data.actions || []; S.meta = data.meta || {}; S.nextId = data.nextId || 1;
+    S.activeId = data.activeId; S.base = data.base || 0;
+    const t = data.trace || {};
+    if (t.blob && await setTraceBlob(t.blob, false)){
+      if (Array.isArray(t.m)) S.trace.m = new DOMMatrix(t.m);
+      S.trace.opacity = t.opacity ?? 45; S.trace.visible = t.visible !== false; S.trace.onTop = !!t.onTop;
+    }
+  } else S = newState(1536, 2048);
+  startProject();
+  setTool(prefs.tool);
+  getDownloads();
+}
+boot();
+})();
+</script>
+</body>
+</html>
