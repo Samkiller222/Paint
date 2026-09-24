@@ -11,6 +11,7 @@
 :root{
   --bg:#E2E6E3; --chrome:#F4F6F3; --panel:#FFFFFF; --ink:#23272B; --muted:#646C73;
   --line:#D3D9D5; --blue:#2F82BD; --blue-soft:#E1EEF8; --rec:#CF3F39; --sel:#E9EDEA;
+  --ring-in:rgba(0,0,0,.6); --ring-out:rgba(255,255,255,.85);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark){
@@ -58,11 +59,16 @@ main.no-panel{ grid-template-columns:60px 1fr 0; }
 .swatch{ width:36px; height:36px; border-radius:50%; border:2px solid var(--panel); box-shadow:0 0 0 1px var(--line); position:relative; overflow:hidden; display:block; cursor:pointer; }
 .swatch input{ position:absolute; inset:-8px; width:60px; height:60px; opacity:0; cursor:pointer; }
 .vslider{ display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11px; color:var(--muted); }
-.vslider input{ writing-mode:vertical-lr; direction:rtl; width:28px; height:120px; accent-color:var(--ink); }
+.vslider input{ writing-mode:vertical-lr; direction:rtl; width:28px; height:104px; accent-color:var(--ink); }
+.recent{ display:grid; grid-template-columns:repeat(2,22px); gap:6px; }
+.recent[hidden]{ display:none; }
+.recent button{ width:22px; height:22px; border-radius:50%; border:2px solid var(--panel); box-shadow:0 0 0 1px var(--line); }
 .vslider output{ font-variant-numeric:tabular-nums; color:var(--ink); font-weight:600; font-size:12px; }
 
 #viewport{ position:relative; overflow:hidden; background:var(--bg); touch-action:none; min-width:0; min-height:0; }
 #viewport.trace-mode{ cursor:move; }
+#viewport[data-tool=pen], #viewport[data-tool=eraser], #viewport[data-tool=fill], #viewport[data-tool=picker]{ cursor:crosshair; }
+#cursor{ position:absolute; left:0; top:0; border-radius:50%; border:1px solid var(--ring-in); box-shadow:0 0 0 1px var(--ring-out); pointer-events:none; display:none; }
 #stage{ position:absolute; left:0; top:0; transform-origin:0 0; background:#fff; box-shadow:0 0 0 1px rgba(0,0,0,.07), 0 10px 34px rgba(0,0,0,.14); }
 #stage canvas.layer{ position:absolute; left:0; top:0; width:100%; height:100%; }
 #trace{ position:absolute; left:0; top:0; transform-origin:0 0; pointer-events:none; max-width:none; }
@@ -97,7 +103,15 @@ main.no-panel .panel{ display:none; }
 .check{ display:flex; align-items:center; gap:8px; font-size:13px; min-height:32px; }
 .check input{ width:18px; height:18px; accent-color:var(--blue); }
 
-dialog{ border:1px solid var(--line); border-radius:14px; background:var(--panel); color:var(--ink); padding:18px; width:min(440px, calc(100vw - 32px)); max-height:calc(100% - 32px); }
+dialog{ border:1px solid var(--line); border-radius:14px; background:var(--panel); color:var(--ink); padding:18px; width:min(440px, calc(100vw - 32px)); max-height:calc(100% - 32px); overflow-y:auto; }
+dialog h3.sub{ margin:16px 0 8px; font-size:14px; font-weight:600; color:var(--muted); }
+dialog p.note{ font-size:13px; margin:0 0 8px; }
+.bgrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.bcard{ border:1px solid var(--line); border-radius:10px; padding:8px 10px; text-align:left; display:flex; flex-direction:column; gap:2px; background:var(--chrome); min-height:44px; }
+.bcard[aria-pressed="true"]{ border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
+.bcard canvas{ width:100%; height:auto; aspect-ratio:150/40; display:block; margin-bottom:4px; }
+.bcard b{ font-size:14px; font-weight:600; }
+.bcard small{ font-size:12px; color:var(--muted); line-height:1.3; }
 dialog::backdrop{ background:rgba(0,0,0,.4); }
 dialog h2{ margin:0 0 6px; font-size:19px; }
 dialog p{ margin:0 0 14px; color:var(--muted); line-height:1.5; font-size:14px; }
@@ -146,11 +160,15 @@ dialog p{ margin:0 0 14px; color:var(--muted); line-height:1.5; font-size:14px; 
   </header>
   <main id="main">
     <nav class="rail" aria-label="Tools">
-      <button class="tb" data-tool="pen" aria-label="Pen" aria-pressed="true"></button>
+      <button class="tb" data-tool="pen" aria-label="Draw" aria-pressed="true"></button>
       <button class="tb" data-tool="eraser" aria-label="Eraser" aria-pressed="false"></button>
+      <button class="tb" data-tool="fill" aria-label="Fill" aria-pressed="false"></button>
+      <button class="tb" data-tool="picker" aria-label="Pick colour from canvas" aria-pressed="false"></button>
       <button class="tb" data-tool="trace" aria-label="Move trace image" aria-pressed="false"></button>
+      <button class="tb" id="btnBrushes" aria-label="Brushes"></button>
       <hr>
       <label class="swatch" id="swatch" aria-label="Colour"><input type="color" id="color" value="#23272b"></label>
+      <div class="recent" id="recent" aria-label="Recent colours" hidden></div>
       <div class="vslider"><output id="sizeOut">6</output><input type="range" id="size" min="1" max="120" value="6" aria-label="Brush size"><span>Size</span></div>
       <div class="vslider"><output id="opOut">100</output><input type="range" id="opacity" min="5" max="100" value="100" aria-label="Brush opacity"><span>Opacity</span></div>
     </nav>
@@ -200,6 +218,17 @@ dialog p{ margin:0 0 14px; color:var(--muted); line-height:1.5; font-size:14px; 
     <div class="field" style="padding:0 10px"><span>Line smoothing</span><input type="range" id="optSmooth" min="0" max="100" value="45"><output id="optSmoothOut">45</output></div>
   </div>
   <div class="btns"><button class="btn" data-close>Close</button></div>
+</dialog>
+
+<dialog id="brushDlg">
+  <h2>Brushes</h2>
+  <div class="bgrid" id="brushList"></div>
+  <h3 class="sub">Eraser</h3>
+  <div class="bgrid" id="eraserList"></div>
+  <h3 class="sub">Fill</h3>
+  <p class="note">Tap an area to fill it. Only the current layer is used to find edges, so the trace image never gets in the way.</p>
+  <div class="field"><span>Tolerance</span><input type="range" id="optTol" min="0" max="100" value="20"><output id="optTolOut">20</output></div>
+  <div class="btns"><button class="btn" data-close>Done</button></div>
 </dialog>
 
 <dialog id="newDlg">
@@ -272,7 +301,14 @@ const P = {
   clear:'M5 5l14 14M19 5L5 19',
   trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   image:'M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15 9.5a1.5 1.5 0 100-.01',
-  doc:'M6 3h9l4 4v14H6zM14 3v5h5'
+  doc:'M6 3h9l4 4v14H6zM14 3v5h5',
+  pencil:'M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3M5 16l3 3',
+  marker:'M9 19l-4-4 9-9 4 4-9 9zM5 15l-2 5 5-2M12 8l4 4',
+  nib:'M12 3l5 8-5 10-5-10 5-8zM12 11v4',
+  air:'M11.4 12a.6 .6 0 101.2 0a.6 .6 0 10-1.2 0M7.4 8.5a.6 .6 0 101.2 0a.6 .6 0 10-1.2 0M15.4 8.5a.6 .6 0 101.2 0a.6 .6 0 10-1.2 0M7.4 15.5a.6 .6 0 101.2 0a.6 .6 0 10-1.2 0M15.4 15.5a.6 .6 0 101.2 0a.6 .6 0 10-1.2 0M11.4 5a.6 .6 0 101.2 0a.6 .6 0 10-1.2 0M11.4 19a.6 .6 0 101.2 0a.6 .6 0 10-1.2 0M3.9 12a.6 .6 0 101.2 0a.6 .6 0 10-1.2 0M18.9 12a.6 .6 0 101.2 0a.6 .6 0 10-1.2 0',
+  fill:'M5 11l7-7 7 7-7 7-7-7zM5 11h14M20 15.5s-2 2.4-2 3.5a2 2 0 004 0c0-1.1-2-3.5-2-3.5z',
+  picker:'M15 4l5 5M17.5 6.5L7 17l-3 1 1-3L15.5 4.5M8 12h7',
+  brushes:'M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4'
 };
 const icon = (n, cls='ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${P[n]}"/></svg>`;
 const setIcon = (el, n) => { el.innerHTML = icon(n); };
@@ -281,6 +317,9 @@ setIcon($('#btnFit'),'fit'); setIcon($('#btnLayers'),'layers');
 setIcon(document.querySelector('[data-tool=pen]'),'pen');
 setIcon(document.querySelector('[data-tool=eraser]'),'eraser');
 setIcon(document.querySelector('[data-tool=trace]'),'move');
+setIcon(document.querySelector('[data-tool=fill]'),'fill');
+setIcon(document.querySelector('[data-tool=picker]'),'picker');
+setIcon($('#btnBrushes'),'brushes');
 $('#btnAddLayer').innerHTML = icon('plus') + 'Add layer';
 setIcon($('#btnUp'),'up'); setIcon($('#btnDown'),'down'); setIcon($('#btnRename'),'edit');
 setIcon($('#btnClear'),'clear'); setIcon($('#btnDelete'),'trash');
@@ -291,15 +330,17 @@ const viewport = $('#viewport'), stage = $('#stage'), main = $('#main');
 const traceEl = new Image(); traceEl.id = 'trace'; traceEl.alt = ''; traceEl.draggable = false;
 const liveTemp = document.createElement('canvas'); liveTemp.className = 'layer';
 const liveCtx = liveTemp.getContext('2d');
+const cursorEl = document.createElement('div'); cursorEl.id = 'cursor'; viewport.append(cursorEl);
 
 /* ---------- toast ---------- */
 let toastT;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 2600); }
 
 /* ---------- prefs ---------- */
-const prefs = { tool:'pen', color:'#23272b', size:6, opacity:100, smooth:45, fingerDraw:false, lockView:false };
+const prefs = { tool:'pen', brush:'pen', eBrush:'pen', color:'#23272b', size:6, opacity:100, smooth:45, tol:20, recent:[], fingerDraw:false, lockView:false };
 try { Object.assign(prefs, JSON.parse(localStorage.getItem('nonphoto-prefs') || '{}')); } catch(e){}
-if (prefs.tool === 'trace') prefs.tool = 'pen';
+if (prefs.tool === 'trace' || prefs.tool === 'picker') prefs.tool = 'pen';
+prefs.recent = Array.isArray(prefs.recent) ? prefs.recent.filter(c => /^#[0-9a-f]{6}$/i.test(c)).slice(0, 6) : [];
 function savePrefs(){ try { localStorage.setItem('nonphoto-prefs', JSON.stringify(prefs)); } catch(e){} }
 
 /* ---------- storage (IndexedDB) ---------- */
@@ -332,29 +373,210 @@ const activeLayer = () => { const i = findL(S.world, S.activeId); return i >= 0 
 const isPriv = id => !!(S.meta[id] && S.meta[id].priv);
 
 /* ---------- stroke rendering (shared by live, rebuild and timelapse) ---------- */
+// Every brush must draw segment i from points i-1 and i alone (plus data derived
+// deterministically from earlier points), so drawing a stroke in chunks while live
+// gives exactly the same pixels as drawing it in one go during a rebuild.
+const BRUSHES = [
+  { id:'pen', name:'Pen', desc:'Smooth ink. Pressure sets width.', icon:'pen' },
+  { id:'pencil', name:'Pencil', desc:'Grainy. Pressure sets darkness.', icon:'pencil' },
+  { id:'marker', name:'Marker', desc:'Even width. Ignores pressure.', icon:'marker' },
+  { id:'ink', name:'Calligraphy', desc:'Angled nib, thick and thin by direction.', icon:'nib' },
+  { id:'air', name:'Airbrush', desc:'Soft spray. Pressure sets flow.', icon:'air' }
+];
+const ERASERS = [
+  { id:'pen', name:'Hard eraser', desc:'Clean edges.', icon:'eraser' },
+  { id:'air', name:'Soft eraser', desc:'Fades out gently.', icon:'air' }
+];
+const brushOf = (list, id) => list.find(b => b.id === id) || list[0];
+
 const widthOf = (s, p) => Math.max(0.5, s.s * (0.15 + 0.85 * p));
-function drawSegs(ctx, s, from, to, color){
+const markerWidth = s => s.s;
+const pencilWidth = (s, p) => Math.max(0.5, s.s * (0.5 + 0.5 * p));
+function drawSegs(ctx, s, from, to, style, wf = widthOf){
   const p = s.p, n = p.length / 3;
-  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = style; ctx.fillStyle = style; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (n === 1){
-    if (from === 0){ ctx.beginPath(); ctx.arc(p[0], p[1], widthOf(s, p[2]) / 2, 0, Math.PI * 2); ctx.fill(); }
+    if (from === 0){ ctx.beginPath(); ctx.arc(p[0], p[1], wf(s, p[2]) / 2, 0, Math.PI * 2); ctx.fill(); }
     return;
   }
   for (let i = Math.max(1, from); i < to; i++){
     const j = i * 3, k = j - 3;
-    ctx.lineWidth = widthOf(s, (p[k + 2] + p[j + 2]) / 2);
+    ctx.lineWidth = wf(s, (p[k + 2] + p[j + 2]) / 2);
     ctx.beginPath(); ctx.moveTo(p[k], p[k + 1]); ctx.lineTo(p[j], p[j + 1]); ctx.stroke();
   }
+}
+
+function rgbOf(hex){
+  let h = hex.slice(1); if (h.length === 3) h = h.replace(/./g, c => c + c);
+  const v = parseInt(h, 16) || 0; return [v >> 16 & 255, v >> 8 & 255, v & 255];
+}
+function mulberry32(a){ return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const texCache = new Map();
+function cachedTex(key, make){
+  let v = texCache.get(key);
+  if (!v){ if (texCache.size > 48) texCache.clear(); v = make(); texCache.set(key, v); }
+  return v;
+}
+
+// Pencil: a fixed grain field, thresholded to fully opaque or fully clear pixels.
+// Overlapping segments then never darken each other, and more pressure just
+// switches on more grains.
+const GRAIN = 128;
+let grainField = null;
+function grainTex(color, lv){
+  return cachedTex(`g${color}${lv}`, () => {
+    if (!grainField){
+      const rnd = mulberry32(20240917), B = GRAIN / 4, coarse = new Float32Array(B * B);
+      for (let i = 0; i < coarse.length; i++) coarse[i] = rnd();
+      grainField = new Float32Array(GRAIN * GRAIN);
+      for (let y = 0; y < GRAIN; y++) for (let x = 0; x < GRAIN; x++)
+        grainField[y * GRAIN + x] = 0.6 * rnd() + 0.4 * coarse[(y >> 2) * B + (x >> 2)];
+    }
+    const c = mkCanvas(GRAIN, GRAIN), x = c.getContext('2d'), img = x.createImageData(GRAIN, GRAIN), d = img.data;
+    const [r, g, b] = rgbOf(color), density = 0.22 + 0.1 * lv;
+    for (let i = 0; i < grainField.length; i++) if (grainField[i] < density){ const j = i * 4; d[j] = r; d[j + 1] = g; d[j + 2] = b; d[j + 3] = 255; }
+    x.putImageData(img, 0, 0);
+    return c;
+  });
+}
+function drawPencil(ctx, s, from, to, color){
+  const p = s.p, n = p.length / 3;
+  const lvOf = pr => Math.max(0, Math.min(7, Math.round(pr * 7)));
+  const pat = lv => ctx.createPattern(grainTex(color, lv), 'repeat');
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (n === 1){
+    if (from === 0){ ctx.fillStyle = pat(lvOf(p[2])); ctx.beginPath(); ctx.arc(p[0], p[1], pencilWidth(s, p[2]) / 2, 0, Math.PI * 2); ctx.fill(); }
+    return;
+  }
+  let last = -1;
+  for (let i = Math.max(1, from); i < to; i++){
+    const j = i * 3, k = j - 3, pr = (p[k + 2] + p[j + 2]) / 2, lv = lvOf(pr);
+    if (lv !== last){ ctx.strokeStyle = pat(lv); last = lv; }
+    ctx.lineWidth = pencilWidth(s, pr);
+    ctx.beginPath(); ctx.moveTo(p[k], p[k + 1]); ctx.lineTo(p[j], p[j + 1]); ctx.stroke();
+  }
+}
+
+// Calligraphy: a flat nib held at 45 degrees, swept between points.
+function drawInk(ctx, s, from, to, color){
+  const p = s.p, n = p.length / 3, cx = Math.SQRT1_2, cy = -Math.SQRT1_2;
+  const half = i => Math.max(0.5, s.s * (0.3 + 0.7 * p[i * 3 + 2])) / 2;
+  ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(1, s.s * 0.1);
+  if (n === 1){
+    if (from === 0){ const h = half(0); ctx.beginPath(); ctx.moveTo(p[0] - cx * h, p[1] - cy * h); ctx.lineTo(p[0] + cx * h, p[1] + cy * h); ctx.stroke(); }
+    return;
+  }
+  for (let i = Math.max(1, from); i < to; i++){
+    const j = i * 3, k = j - 3, ha = half(i - 1), hb = half(i);
+    ctx.beginPath();
+    ctx.moveTo(p[k] + cx * ha, p[k + 1] + cy * ha); ctx.lineTo(p[k] - cx * ha, p[k + 1] - cy * ha);
+    ctx.lineTo(p[j] - cx * hb, p[j + 1] - cy * hb); ctx.lineTo(p[j] + cx * hb, p[j + 1] + cy * hb);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+}
+
+// Airbrush: soft dots stamped at fixed distances along the whole stroke, so where
+// a stamp lands never depends on how the stroke was split into chunks.
+const lenCache = new WeakMap();
+function cumLen(s, n){
+  let L = lenCache.get(s);
+  if (!L){ L = [0]; lenCache.set(s, L); }
+  const p = s.p;
+  for (let i = L.length; i < n; i++){ const j = i * 3; L.push(L[i - 1] + Math.hypot(p[j] - p[j - 3], p[j + 1] - p[j - 2])); }
+  return L;
+}
+function softDot(color){
+  return cachedTex(`a${color}`, () => {
+    const N = 128, c = mkCanvas(N, N), x = c.getContext('2d'), [r, g, b] = rgbOf(color);
+    const gr = x.createRadialGradient(N / 2, N / 2, 0, N / 2, N / 2, N / 2);
+    gr.addColorStop(0, `rgba(${r},${g},${b},1)`); gr.addColorStop(0.45, `rgba(${r},${g},${b},0.55)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    x.fillStyle = gr; x.fillRect(0, 0, N, N);
+    return c;
+  });
+}
+function drawAir(ctx, s, from, to, color){
+  const p = s.p, n = p.length / 3, r = s.s / 2, dot = softDot(color);
+  const stamp = (x, y, pr) => { ctx.globalAlpha = 0.04 + 0.16 * pr; ctx.drawImage(dot, x - r, y - r, r * 2, r * 2); };
+  ctx.save();
+  if (n === 1){ if (from === 0) stamp(p[0], p[1], p[2]); }
+  else {
+    const L = cumLen(s, to), sp = Math.max(0.5, s.s * 0.12);
+    for (let i = Math.max(1, from); i < to; i++){
+      const j = i * 3, k = j - 3, a = L[i - 1], b = L[i];
+      for (let m = Math.ceil(a / sp); m * sp < b; m++){
+        const t = (m * sp - a) / (b - a);
+        stamp(p[k] + (p[j] - p[k]) * t, p[k + 1] + (p[j + 1] - p[k + 1]) * t, p[k + 2] + (p[j + 2] - p[k + 2]) * t);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function paint(ctx, s, from, to, color){
+  switch (s.b){
+    case 'pencil': drawPencil(ctx, s, from, to, color); break;
+    case 'marker': drawSegs(ctx, s, from, to, color, markerWidth); break;
+    case 'ink': drawInk(ctx, s, from, to, color); break;
+    case 'air': drawAir(ctx, s, from, to, color); break;
+    default: drawSegs(ctx, s, from, to, color);
+  }
+}
+
+/* ---------- fill ---------- */
+// Only the target layer's own pixels decide the region. Colours are compared
+// premultiplied so transparent pixels all count as the same colour.
+function floodFill(world, L, a){
+  const w = world.w, h = world.h, x0 = a.x, y0 = a.y;
+  if (x0 < 0 || y0 < 0 || x0 >= w || y0 >= h) return;
+  const d = L.ctx.getImageData(0, 0, w, h).data;
+  const j0 = (y0 * w + x0) * 4, A0 = d[j0 + 3], R0 = d[j0] * A0, G0 = d[j0 + 1] * A0, B0 = d[j0 + 2] * A0;
+  const T = a.g, T2 = a.g * 255;
+  const ok = i => { const j = i * 4, A = d[j + 3];
+    return Math.abs(A - A0) <= T && Math.abs(d[j] * A - R0) <= T2 && Math.abs(d[j + 1] * A - G0) <= T2 && Math.abs(d[j + 2] * A - B0) <= T2; };
+  const mask = new Uint8Array(w * h), stack = [x0, y0];
+  while (stack.length){
+    const y = stack.pop(), x = stack.pop(), row = y * w;
+    if (mask[row + x] || !ok(row + x)) continue;
+    let l = x, r = x;
+    while (l > 0 && !mask[row + l - 1] && ok(row + l - 1)) l--;
+    while (r < w - 1 && !mask[row + r + 1] && ok(row + r + 1)) r++;
+    for (let xx = l; xx <= r; xx++) mask[row + xx] = 1;
+    for (const ny of [y - 1, y + 1]){
+      if (ny < 0 || ny >= h) continue;
+      const nr = ny * w; let open = false;
+      for (let xx = l; xx <= r; xx++){
+        const can = !mask[nr + xx] && ok(nr + xx);
+        if (can && !open) stack.push(xx, ny);
+        open = can;
+      }
+    }
+  }
+  // Grow the region by a pixel so it tucks under anti-aliased line edges.
+  const [cr, cg, cb] = rgbOf(a.c), img = new ImageData(w, h), o = img.data;
+  for (let y = 0; y < h; y++){
+    const row = y * w;
+    for (let x = 0; x < w; x++){
+      const i = row + x;
+      if (mask[i] || (x > 0 && mask[i - 1]) || (x < w - 1 && mask[i + 1]) || (y > 0 && mask[i - w]) || (y < h - 1 && mask[i + w])){
+        const j = i * 4; o[j] = cr; o[j + 1] = cg; o[j + 2] = cb; o[j + 3] = 255;
+      }
+    }
+  }
+  const tc = world.temp.getContext('2d');
+  tc.putImageData(img, 0, 0);
+  L.ctx.save(); L.ctx.globalAlpha = a.o; L.ctx.drawImage(world.temp, 0, 0); L.ctx.restore();
+  tc.clearRect(0, 0, w, h);
 }
 function renderStroke(ctx, s, temp){
   const n = s.p.length / 3;
   if (s.tool === 'eraser'){
-    ctx.save(); ctx.globalCompositeOperation = 'destination-out'; drawSegs(ctx, s, 0, n, '#000'); ctx.restore(); return;
+    ctx.save(); ctx.globalCompositeOperation = 'destination-out'; paint(ctx, s, 0, n, '#000'); ctx.restore(); return;
   }
-  if (s.o >= 1){ drawSegs(ctx, s, 0, n, s.c); return; }
+  if (s.o >= 1){ paint(ctx, s, 0, n, s.c); return; }
   const tc = temp.getContext('2d');
   tc.clearRect(0, 0, temp.width, temp.height);
-  drawSegs(tc, s, 0, n, s.c);
+  paint(tc, s, 0, n, s.c);
   ctx.save(); ctx.globalAlpha = s.o; ctx.drawImage(temp, 0, 0); ctx.restore();
   tc.clearRect(0, 0, temp.width, temp.height);
 }
@@ -373,9 +595,10 @@ function applyAction(world, a){
     case 'move': if (i >= 0){ const [L] = world.layers.splice(i, 1); world.layers.splice(Math.min(a.to, world.layers.length), 0, L); } break;
     case 'clear': if (i >= 0) world.layers[i].ctx.clearRect(0, 0, world.w, world.h); break;
     case 'stroke': if (i >= 0) renderStroke(world.layers[i].ctx, a, world.temp); break;
+    case 'fill': if (i >= 0) floodFill(world, world.layers[i], a); break;
   }
 }
-const structural = a => a.t !== 'stroke' && a.t !== 'clear';
+const structural = a => a.t !== 'stroke' && a.t !== 'clear' && a.t !== 'fill';
 
 function copyCanvas(c){ const d = mkCanvas(c.width, c.height); d.getContext('2d').drawImage(c, 0, 0); return d; }
 function takeSnap(world, n){ S.snap = { n, layers: world.layers.map(l => ({ id:l.id, visible:l.visible, copy:copyCanvas(l.canvas) })) }; }
@@ -552,6 +775,9 @@ const vp = new Map(); // touch points for view gestures
 let vStart = null;
 const tp = new Map(); // pointers for trace adjusting
 let tStart = null;
+let pend = null;      // fill waiting for its pointerup
+let picking = null;   // eyedropper pointer
+const busy = () => !!(cur || pend || picking);
 
 const pressureOf = e => e.pointerType === 'pen' ? (e.pressure > 0 ? e.pressure : 0.5) : 1;
 const smoothK = () => 1 - (prefs.smooth / 100) * 0.9;
@@ -561,7 +787,7 @@ function startStroke(e){
   if (!L) return;
   if (!L.visible){ toast('This layer is hidden. Show it to draw on it.'); return; }
   const p = toCanvas(e), pr = pressureOf(e);
-  const s = { t:'stroke', id:L.id, tool:prefs.tool, c:prefs.color, s:prefs.size, o: prefs.tool === 'eraser' ? 1 : prefs.opacity / 100, p:[r1(p.x), r1(p.y), r2(pr)] };
+  const s = { t:'stroke', id:L.id, tool:prefs.tool, b: prefs.tool === 'eraser' ? prefs.eBrush : prefs.brush, c:prefs.color, s:prefs.size, o: prefs.tool === 'eraser' ? 1 : prefs.opacity / 100, p:[r1(p.x), r1(p.y), r2(pr)] };
   cur = { pid:e.pointerId, type:e.pointerType, s, x:p.x, y:p.y, pr, rx:p.x, ry:p.y, rp:pr, drawn:1, t0:performance.now() };
   liveTemp.style.opacity = s.o;
 }
@@ -577,8 +803,8 @@ function flushLive(){
   const s = cur.s, n = s.p.length / 3;
   if (n <= cur.drawn) return;
   if (s.tool === 'eraser'){
-    const c = activeLayer().ctx; c.save(); c.globalCompositeOperation = 'destination-out'; drawSegs(c, s, cur.drawn, n, '#000'); c.restore();
-  } else drawSegs(liveCtx, s, cur.drawn, n, s.c);
+    const c = activeLayer().ctx; c.save(); c.globalCompositeOperation = 'destination-out'; paint(c, s, cur.drawn, n, '#000'); c.restore();
+  } else paint(liveCtx, s, cur.drawn, n, s.c);
   cur.drawn = n;
 }
 function moveStroke(e){
@@ -591,11 +817,12 @@ function endStroke(){
   flushLive();
   const s = cur.s, L = activeLayer(), n = s.p.length / 3;
   if (s.tool === 'pen'){
-    if (n === 1) drawSegs(liveCtx, s, 0, 1, s.c);
+    if (n === 1) paint(liveCtx, s, 0, 1, s.c);
     L.ctx.save(); L.ctx.globalAlpha = s.o; L.ctx.drawImage(liveTemp, 0, 0); L.ctx.restore();
     liveCtx.clearRect(0, 0, S.w, S.h);
+    addRecent(s.c);
   } else if (n === 1){
-    L.ctx.save(); L.ctx.globalCompositeOperation = 'destination-out'; drawSegs(L.ctx, s, 0, 1, '#000'); L.ctx.restore();
+    L.ctx.save(); L.ctx.globalCompositeOperation = 'destination-out'; paint(L.ctx, s, 0, 1, '#000'); L.ctx.restore();
   }
   cur = null;
   pushAction(s, true);
@@ -605,6 +832,37 @@ function cancelStroke(){
   const wasEraser = cur.s.tool === 'eraser';
   cur = null; liveCtx.clearRect(0, 0, S.w, S.h);
   if (wasEraser) rebuild();
+}
+
+function doFill(f){
+  const L = activeLayer();
+  if (!L) return;
+  if (!L.visible){ toast('This layer is hidden. Show it to fill on it.'); return; }
+  const x = Math.floor(f.x), y = Math.floor(f.y);
+  if (x < 0 || y < 0 || x >= S.w || y >= S.h) return;
+  pushAction({ t:'fill', id:L.id, x, y, c:prefs.color, o:prefs.opacity / 100, g:Math.round(prefs.tol * 2.55) });
+  addRecent(prefs.color);
+}
+const pickCtx = mkCanvas(1, 1).getContext('2d', { willReadFrequently:true });
+function pickAt(e){
+  const p = toCanvas(e), x = Math.floor(p.x), y = Math.floor(p.y);
+  if (x < 0 || y < 0 || x >= S.w || y >= S.h) return;
+  pickCtx.globalAlpha = 1; pickCtx.fillStyle = '#fff'; pickCtx.fillRect(0, 0, 1, 1);
+  for (const L of S.world.layers) if (L.visible) pickCtx.drawImage(L.canvas, x, y, 1, 1, 0, 0, 1, 1);
+  const d = pickCtx.getImageData(0, 0, 1, 1).data;
+  prefs.color = '#' + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+  syncBrushUI(); savePrefs();
+}
+function beginAt(e){
+  if (prefs.tool === 'fill'){ const p = toCanvas(e); pend = { pid:e.pointerId, type:e.pointerType, x:p.x, y:p.y, cx:e.clientX, cy:e.clientY }; return; }
+  if (prefs.tool === 'picker'){ picking = { pid:e.pointerId, type:e.pointerType }; pickAt(e); return; }
+  startStroke(e);
+}
+function moveCursor(e){
+  if (e.pointerType === 'touch' || (prefs.tool !== 'pen' && prefs.tool !== 'eraser')){ cursorEl.style.display = 'none'; return; }
+  const p = toViewport(e), d = Math.max(3, prefs.size * Math.hypot(view.a, view.b));
+  cursorEl.style.display = 'block'; cursorEl.style.width = cursorEl.style.height = d + 'px';
+  cursorEl.style.transform = `translate(${p.x - d / 2}px, ${p.y - d / 2}px)`;
 }
 
 function vReset(){ const pts = [...vp.values()]; vStart = pts.length >= 2 ? { m:view, pts:pts.map(p => ({ ...p })) } : null; }
@@ -621,21 +879,25 @@ viewport.addEventListener('pointerdown', e => {
   }
 
   if (e.pointerType === 'touch'){
-    if (prefs.fingerDraw && vp.size === 0 && !cur){ vp.set(e.pointerId, toViewport(e)); startStroke(e); return; }
+    cursorEl.style.display = 'none';
+    if (prefs.fingerDraw && vp.size === 0 && !busy()){ vp.set(e.pointerId, toViewport(e)); beginAt(e); return; }
     vp.set(e.pointerId, toViewport(e));
     if (cur && cur.type === 'touch'){
       if (performance.now() - cur.t0 < 250) cancelStroke(); else return;
     }
+    if (pend && pend.type === 'touch') pend = null;
+    if (picking && picking.type === 'touch') picking = null;
     if (vp.size >= 2 && gestureAllowed()) vReset();
     return;
   }
   if (e.button !== 0 && e.pointerType === 'mouse') return;
-  if (cur) return;
+  if (busy()) return;
   vStart = null;
-  startStroke(e);
+  beginAt(e);
 });
 viewport.addEventListener('pointermove', e => {
   if (e.pointerType === 'pen') lastPen = performance.now();
+  moveCursor(e);
   if (prefs.tool === 'trace'){
     if (!tp.has(e.pointerId) || !tStart) return;
     const p = toCanvas(e); tp.set(e.pointerId, { x:p.x, y:p.y });
@@ -646,6 +908,8 @@ viewport.addEventListener('pointermove', e => {
     S.trace.m = d.multiply(tStart.m); applyTraceStyle();
     return;
   }
+  if (pend && e.pointerId === pend.pid && Math.hypot(e.clientX - pend.cx, e.clientY - pend.cy) > 12) pend = null;
+  if (picking && e.pointerId === picking.pid) pickAt(e);
   if (cur && e.pointerId === cur.pid){ if (vp.has(e.pointerId)) vp.set(e.pointerId, toViewport(e)); moveStroke(e); return; }
   if (vp.has(e.pointerId)){
     vp.set(e.pointerId, toViewport(e));
@@ -661,6 +925,8 @@ function pointerEnd(e){
     if (tp.delete(e.pointerId)){ tReset(); if (!tp.size) scheduleSave(); }
     return;
   }
+  if (pend && e.pointerId === pend.pid){ const f = pend; pend = null; if (e.type === 'pointerup') doFill(f); }
+  if (picking && e.pointerId === picking.pid){ picking = null; if (e.type === 'pointerup' && prefs.tool === 'picker') setTool(prevTool); }
   if (cur && e.pointerId === cur.pid){
     if (e.type === 'pointercancel') cancelStroke(); else endStroke();
   }
@@ -668,6 +934,7 @@ function pointerEnd(e){
 }
 viewport.addEventListener('pointerup', pointerEnd);
 viewport.addEventListener('pointercancel', pointerEnd);
+viewport.addEventListener('pointerleave', () => { cursorEl.style.display = 'none'; });
 viewport.addEventListener('contextmenu', e => e.preventDefault());
 viewport.addEventListener('wheel', e => {
   e.preventDefault();
@@ -677,15 +944,83 @@ viewport.addEventListener('wheel', e => {
 }, { passive:false });
 
 /* ---------- tools and brush ---------- */
+let prevTool = 'pen';
 function setTool(t){
   if (t === 'trace' && !S.trace.url){ toast('Import a trace image first.'); return; }
+  if (t === 'picker' && prefs.tool !== 'picker' && prefs.tool !== 'trace') prevTool = prefs.tool;
   prefs.tool = t; savePrefs();
   document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
   viewport.classList.toggle('trace-mode', t === 'trace');
-  tp.clear(); tStart = null;
+  viewport.dataset.tool = t;
+  tp.clear(); tStart = null; pend = null; picking = null;
+  cursorEl.style.display = 'none';
   applyTraceStyle(); renderPanel();
 }
-document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => {
+  const t = b.dataset.tool;
+  if (t === prefs.tool && (t === 'pen' || t === 'eraser' || t === 'fill')){ openBrushes(); return; }
+  setTool(t);
+  if (t === 'fill') toast('Tap an area to fill it on this layer.');
+  if (t === 'picker') toast('Tap the canvas to pick a colour.');
+});
+function syncToolIcons(){
+  const B = brushOf(BRUSHES, prefs.brush), E = brushOf(ERASERS, prefs.eBrush);
+  const pen = document.querySelector('[data-tool=pen]'), er = document.querySelector('[data-tool=eraser]');
+  setIcon(pen, B.icon); pen.setAttribute('aria-label', `Draw with ${B.name}`);
+  er.setAttribute('aria-label', E.name);
+}
+function addRecent(c){
+  if (prefs.recent[0] === c) return;
+  prefs.recent = [c, ...prefs.recent.filter(x => x !== c)].slice(0, 6);
+  savePrefs(); renderRecent();
+}
+function renderRecent(){
+  const box = $('#recent'); box.replaceChildren();
+  for (const c of prefs.recent){
+    const b = document.createElement('button');
+    b.style.background = c; b.setAttribute('aria-label', `Use colour ${c}`);
+    b.onclick = () => { prefs.color = c; syncBrushUI(); savePrefs(); if (prefs.tool !== 'pen' && prefs.tool !== 'fill') setTool('pen'); };
+    box.append(b);
+  }
+  box.hidden = !prefs.recent.length;
+}
+
+/* ---------- brushes dialog ---------- */
+function previewBrush(cv, item, kind, ink){
+  const W = 150, H = 40, k = 2; cv.width = W * k; cv.height = H * k;
+  const x = cv.getContext('2d'); x.scale(k, k);
+  const p = [];
+  for (let i = 0; i <= 48; i++){ const t = i / 48; p.push(r1(10 + t * (W - 20)), r1(H / 2 + Math.sin(t * Math.PI * 2) * H * 0.24), r2(0.15 + 0.85 * Math.sin(t * Math.PI))); }
+  const s = { t:'stroke', tool:kind, b:item.id, c:ink, s:9, o:1, p };
+  if (kind === 'eraser'){ x.fillStyle = ink; x.fillRect(0, 9, W, H - 18); x.globalCompositeOperation = 'destination-out'; paint(x, s, 0, p.length / 3, '#000'); }
+  else paint(x, s, 0, p.length / 3, ink);
+}
+function openBrushes(){
+  const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#23272b';
+  const fillList = (box, list, kind) => {
+    box.replaceChildren();
+    for (const item of list){
+      const b = document.createElement('button'), cv = document.createElement('canvas');
+      const on = kind === 'pen' ? prefs.brush === item.id : prefs.eBrush === item.id;
+      b.className = 'bcard'; b.setAttribute('aria-pressed', String(on));
+      const nm = document.createElement('b'), ds = document.createElement('small');
+      nm.textContent = item.name; ds.textContent = item.desc;
+      b.append(cv, nm, ds);
+      previewBrush(cv, item, kind, ink);
+      b.onclick = () => {
+        if (kind === 'pen') prefs.brush = item.id; else prefs.eBrush = item.id;
+        savePrefs(); syncToolIcons(); setTool(kind); $('#brushDlg').close();
+      };
+      box.append(b);
+    }
+  };
+  fillList($('#brushList'), BRUSHES, 'pen');
+  fillList($('#eraserList'), ERASERS, 'eraser');
+  $('#optTol').value = prefs.tol; $('#optTolOut').textContent = prefs.tol;
+  $('#brushDlg').showModal();
+}
+$('#btnBrushes').onclick = openBrushes;
+$('#optTol').oninput = e => { prefs.tol = +e.target.value; $('#optTolOut').textContent = prefs.tol; savePrefs(); };
 const colorIn = $('#color'), sizeIn = $('#size'), opIn = $('#opacity');
 function syncBrushUI(){
   colorIn.value = prefs.color; $('#swatch').style.background = prefs.color;
@@ -717,6 +1052,12 @@ document.addEventListener('keydown', e => {
   else if (mod && e.key.toLowerCase() === 'y'){ e.preventDefault(); redo(); }
   else if (!mod && e.key === 'b') setTool('pen');
   else if (!mod && e.key === 'e') setTool('eraser');
+  else if (!mod && e.key === 'g') setTool('fill');
+  else if (!mod && e.key === 'i') setTool('picker');
+  else if (!mod && (e.key === '[' || e.key === ']')){
+    const step = Math.max(1, Math.round(prefs.size * 0.15)) * (e.key === ']' ? 1 : -1);
+    prefs.size = Math.max(1, Math.min(120, prefs.size + step)); syncBrushUI(); savePrefs();
+  }
 });
 
 /* ---------- trace image ---------- */
@@ -833,7 +1174,7 @@ function pickMime(){
   return list.find(m => { try { return MediaRecorder.isTypeSupported(m); } catch(e){ return false; } }) || '';
 }
 function openTimelapse(){
-  const strokes = S.actions.filter(a => a.t === 'stroke' && !isPriv(a.id)).length;
+  const strokes = S.actions.filter(a => (a.t === 'stroke' || a.t === 'fill') && !isPriv(a.id)).length;
   if (!strokes){ toast('Nothing to replay yet. Draw something first.'); return; }
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream){ toast("This browser can't record video."); return; }
   $('#tlSetup').hidden = false; $('#tlRun').hidden = true;
@@ -861,21 +1202,25 @@ $('#tlStart').onclick = async () => {
   const tctx = world.temp.getContext('2d');
   const acts = S.actions.slice();
   let total = 0;
-  for (const a of acts) if (a.t === 'stroke' && !isPriv(a.id)) total += a.p.length / 3;
+  const FILL_COST = 20; // a fill appears at once, then holds for a moment
+  for (const a of acts) if (!isPriv(a.id)){ if (a.t === 'stroke') total += a.p.length / 3; else if (a.t === 'fill') total += FILL_COST; }
   const fps = 30, per = Math.max(1, total / (seconds * fps));
   let ai = 0, pi = 0, inStroke = null;
 
   function step(budget){
     while (budget > 0 && ai < acts.length){
       const a = acts[ai];
-      if (a.t !== 'stroke'){ if (!(a.t === 'clear' && isPriv(a.id))) applyAction(world, a); ai++; continue; }
+      if (a.t !== 'stroke'){
+        if (!((a.t === 'clear' || a.t === 'fill') && isPriv(a.id))){ applyAction(world, a); if (a.t === 'fill') budget -= FILL_COST; }
+        ai++; continue;
+      }
       const li = findL(world, a.id);
       if (isPriv(a.id) || li < 0){ ai++; continue; }
       const L = world.layers[li], n = a.p.length / 3;
       if (!inStroke){ inStroke = a; pi = 0; }
       const to = Math.min(n, pi + Math.ceil(budget));
-      if (a.tool === 'eraser'){ L.ctx.save(); L.ctx.globalCompositeOperation = 'destination-out'; drawSegs(L.ctx, a, pi, to, '#000'); L.ctx.restore(); }
-      else drawSegs(tctx, a, pi, to, a.c);
+      if (a.tool === 'eraser'){ L.ctx.save(); L.ctx.globalCompositeOperation = 'destination-out'; paint(L.ctx, a, pi, to, '#000'); L.ctx.restore(); }
+      else paint(tctx, a, pi, to, a.c);
       budget -= Math.max(1, to - pi); pi = to;
       if (pi >= n){
         if (a.tool === 'pen'){ L.ctx.save(); L.ctx.globalAlpha = a.o; L.ctx.drawImage(world.temp, 0, 0); L.ctx.restore(); tctx.clearRect(0, 0, S.w, S.h); }
@@ -933,7 +1278,7 @@ function startProject(){
   requestAnimationFrame(fitView);
 }
 async function boot(){
-  syncBrushUI();
+  syncBrushUI(); syncToolIcons(); renderRecent();
   let data = null;
   try { data = await kvGet('project'); } catch(e){}
   if (data && data.v === 1 && data.w && data.h){
