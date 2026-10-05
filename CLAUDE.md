@@ -15,10 +15,13 @@ Non-photo blue (`--blue`) is used in the UI for anything that is not recorded.
 
 ## Files
 
-- `index.html`: the whole app. HTML, CSS and JS in one file, no build step, no
-  dependencies. Only external request is the Manrope font from Google Fonts.
+- `index.html`: the page markup (toolbar, dialogs, canvas host).
+- `style.css`: all styles, including the colour tokens and dark mode.
+- `app.js`: all app logic, one IIFE loaded as a classic script at the end of `<body>`.
 
-Keep it a single self-contained file unless there's a strong reason not to.
+No build step, no dependencies. Only external request is the Manrope font from
+Google Fonts. When publishing as a claude.ai artifact, include `style.css` and
+`app.js` as supporting files next to the page.
 
 ## How it works
 
